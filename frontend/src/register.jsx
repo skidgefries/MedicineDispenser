@@ -136,7 +136,14 @@ function Register() {
             )}
           </div>
 
-
+          <div className="password-requirements">
+            <p>Password must:</p>
+            <ul>
+              <li className={password.length >= 6 ? 'valid' : ''}>
+                Be at least 6 characters long
+              </li>
+            </ul>
+          </div>
           
           <button 
             type="submit" 
