@@ -1,10 +1,14 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
+// Medicine Schema
 const MedicineSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    name: { type: String, required: true },
-    time: { type: String, required: true },  // Example: "08:00 AM"
-    taken: { type: Boolean, default: false } // Default is unchecked (false)
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
+  name: { type: String, required: true },
+  time: { type: String, required: true },
+  status: { type: Boolean, default: false },
 });
 
-module.exports = mongoose.model('Medicine', MedicineSchema);
+// Check if model is already defined to avoid overwriting
+const Medicine = mongoose.models.Medicine || mongoose.model("Medicine", MedicineSchema);
+
+module.exports = Medicine;

@@ -1,64 +1,90 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const cors = require('cors');
-const authRoutes = require('./routes/auth');
+const cron = require('node-cron');
+require('dotenv').config();
 
-dotenv.config();
+// Initialize app
 const app = express();
-
-// Middleware
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-// MongoDB connection options
-const mongoOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  autoIndex: true,
-};
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log("Error connecting to MongoDB:", err));
 
-// Database connection with retry logic
-const connectWithRetry = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, mongoOptions);
-    console.log('MongoDB Connected Successfully!');
-  } catch (err) {
-    console.error('MongoDB Connection Error:', err);
-    console.log('Retrying connection in 5 seconds...');
-    setTimeout(connectWithRetry, 5000);
-  }
-};
 
-connectWithRetry();
 
-// Routes
+// Medicine Schema
+const MedicineSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" }, 
+  name: { type: String, required: true },
+  time: { type: String, required: true },
+  status: { type: Boolean, default: false },
+});
+
+const Medicine = mongoose.model("Medicine", MedicineSchema);
+
+
+
+
+// Add Medicine
+app.post('/medicine', async (req, res) => {
+    const { userId, name, time } = req.body;
+    try {
+        // Convert userId to a valid MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: "Invalid userId format" });
+        }
+
+        const newMedicine = new Medicine({
+            userId: new mongoose.Types.ObjectId(userId), // Convert userId to ObjectId
+            name,
+            time,
+        });
+
+        await newMedicine.save();
+        res.status(201).json({ message: "Medicine added successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// User ko med display
+app.get('/medicines/:userId', async (req, res) => {
+    try {
+        const medicines = await Medicine.find({ userId: req.params.userId });
+        res.json(medicines);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Midnight ma reset hunchha
+cron.schedule('0 0 * * *', async () => {
+    try {
+        await Medicine.updateMany({}, { $set: { status: false } });
+        console.log("Medicine statuses reset");
+    } catch (err) {
+        console.error("Error resetting medicine statuses:", err);
+    }
+});
+
+const authRoutes = require('./routes/auth');
+const mediRoutes = require('./routes/mediauth') // Ensure correct path
 app.use('/api', authRoutes);
+app.use('/api', mediRoutes);
 
-// Basic route for testing
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
-});
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    success: false,
-    message: 'Something went wrong! Please try again.' 
-  });
-});
 
-// Handle 404 routes
-app.use((req, res) => {
-  res.status(404).json({ 
-    success: false,
-    message: 'Route not found' 
-  });
-});
-
+// server start hunchha
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API URL: http://localhost:${PORT}/api`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
